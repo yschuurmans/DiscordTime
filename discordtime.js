@@ -4,16 +4,22 @@ var selectedTimezone;
 
 $(function () {
     time = spacetime.now().seconds(0);
-    selectedTimezone = "Etc/GMT-0"
+    selectedTimezone = "Eorzean ST (GMT-0)"
     $("#localTimezone").text(time.timezone().name);
 
     var allTimezones = spacetime.timezones();
+	allTimezones["Eorzean ST (GMT-0)"] = {offset: -0, hem: 'n'}
+	allTimezones["Server Time (GMT-0)"] = {offset: -0, hem: 'n'}
     var allTimezones = Object.keys(allTimezones).sort();
     allTimezones.forEach(function (tz, index) {
         $("#dtTimezone").append(`<option value="${tz}">${tz}</option>`)
     });
     
     updateAll();
+	$('select').select2({
+		theme: 'bootstrap-5',
+	});
+
 });
 
 function copyToClip(value) {
@@ -23,15 +29,18 @@ function copyToClip(value) {
 function updateAll() {
     var unix = Math.floor(time.epoch / 1000);
     $("#localTime").text(time.goto(null).format('nice-full'))
-    $("#timezoneName").text(selectedTimezone)
+	
+	$("#timezoneName").text(selectedTimezone)
+	
     $("#timezoneTime").text(time.goto(selectedTimezone).format('nice-full'))
 
 
     $("#dtUnix").val(unix)
     $("#dtText").val(time.format('iso'))
 
-    $("#dtTimezone").val(time.goto(selectedTimezone).timezone().name.toLowerCase())
-
+    $("#dtTimezone").val(selectedTimezone)
+	$('select').select2();
+	
     calculateDiscordNotations(unix);
 }
 
@@ -45,7 +54,7 @@ function setText(text) {
 }
 function setTimezone(timezone) {
     time = time.goto(timezone);
-    selectedTimezone = time.timezone().name;
+    selectedTimezone = timezone;
     updateAll();
 }
 function addMinutes(minutes) {

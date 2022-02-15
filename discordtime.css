@@ -7,3 +7,7 @@
 .outputTable tr td:nth-child(2) {
     padding-left: 5px;
 }
+.select2-search { background-color: #2f2f2f; }
+.select2-results { background-color: #2f2f2f; }
+.select2-selection { background-color: #3b3b3b !IMPORTANT; }
+.select2-selection>span { color: #ffffff !IMPORTANT }
