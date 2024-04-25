@@ -8,17 +8,58 @@ $(function () {
     $("#localTimezone").text(time.timezone().name);
 
     var allTimezones = spacetime.timezones();
-	allTimezones["Eorzean ST (GMT-0)"] = {offset: -0, hem: 'n'}
-	allTimezones["Server Time (GMT-0)"] = {offset: -0, hem: 'n'}
+    allTimezones["Eorzean ST (GMT-0)"] = { offset: -0, hem: 'n' }
+    allTimezones["Server Time (GMT-0)"] = { offset: -0, hem: 'n' }
     var allTimezones = Object.keys(allTimezones).sort();
     allTimezones.forEach(function (tz, index) {
         $("#dtTimezone").append(`<option value="${tz}">${tz}</option>`)
     });
-    
+
     updateAll();
-	$('select').select2({
-		theme: 'bootstrap-5',
-	});
+    $('select').select2({
+        theme: 'bootstrap-5',
+    });
+
+    // Select all elements with the class clickableCopy
+    var copies = document.querySelectorAll('.clickableCopy');
+
+    // Add a click event listener to each selected element
+    copies.forEach(function (copy) {
+        copy.addEventListener('click', function () {
+            // Use the Clipboard API to copy the text content of the clicked element to the clipboard
+            navigator.clipboard.writeText(this.textContent).then(function () {
+                // Create a popup element with the text "Copied!"
+                var popup = document.createElement('div');
+                popup.textContent = 'Copied!';
+                popup.className = 'popup';
+
+                // Get the bounding rectangle of the clicked element
+                var rect = copy.getBoundingClientRect();
+
+                // Position the popup at the top-right corner of the clicked element
+                popup.style.top = rect.top + 'px';
+                popup.style.left = rect.right + 'px';
+
+                // Add the popup to the document
+                document.body.appendChild(popup);
+
+                // Make the popup fade in
+                setTimeout(function () {
+                    popup.style.opacity = '1';
+                }, 5);
+
+                // Make the popup fade out and remove it after a delay
+                setTimeout(function () {
+                    popup.style.opacity = '0';
+                    setTimeout(function () {
+                        document.body.removeChild(popup);
+                    }, 300); // 0.3 seconds
+                }, 2000); // 2 seconds
+            }, function (err) {
+                console.error('Could not copy text: ', err);
+            });
+        });
+    });
 
 });
 
@@ -29,9 +70,9 @@ function copyToClip(value) {
 function updateAll() {
     var unix = Math.floor(time.epoch / 1000);
     $("#localTime").text(time.goto(null).format('nice-full'))
-	
-	$("#timezoneName").text(selectedTimezone)
-	
+
+    $("#timezoneName").text(selectedTimezone)
+
     $("#timezoneTime").text(time.goto(selectedTimezone).format('nice-full'))
 
 
@@ -39,8 +80,8 @@ function updateAll() {
     $("#dtText").val(time.format('iso'))
 
     $("#dtTimezone").val(selectedTimezone)
-	$('select').select2();
-	
+    $('select').select2();
+
     calculateDiscordNotations(unix);
 }
 
@@ -78,7 +119,7 @@ function calculateDiscordNotations(unix) {
     calcf(unix);
     calcF(unix);
     calcR(unix);
-    
+
 }
 
 function calct(unix) {
