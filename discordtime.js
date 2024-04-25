@@ -1,9 +1,23 @@
 
 var time;
 var selectedTimezone;
+const urlSearchParams = Object.fromEntries(new URLSearchParams(window.location.search).entries());
+var querytime = "";
+var querytimezone = "";
+if(Object.keys(urlSearchParams)[0]){
+    querytime = Object.keys(urlSearchParams)[0];
+    
+    if(querytime.split("-")[1]){
+        querytimezone = querytime.split("-")[1];
+    }
+    if(querytime.toLowerCase().endsWith("st")){
+        querytimezone = "Server Time (GMT-0)"
+    }
+}
 
 $(function () {
     time = spacetime.now().seconds(0);
+	
     selectedTimezone = "Eorzean ST (GMT-0)"
     $("#localTimezone").text(time.timezone().name);
 
@@ -15,6 +29,14 @@ $(function () {
         $("#dtTimezone").append(`<option value="${tz}">${tz}</option>`)
     });
 
+	if(querytimezone) {
+        selectedTimezone = querytimezone;
+        time = time.goto(querytimezone);
+    }
+	if(querytime) {
+        time = time.time(querytime);
+    }
+    
     updateAll();
     $('select').select2({
         theme: 'bootstrap-5',
@@ -77,7 +99,7 @@ function updateAll() {
 
 
     $("#dtUnix").val(unix)
-    $("#dtText").val(time.format('iso'))
+    $("#dtText").val(time.goto(null).format('nice'))
 
     $("#dtTimezone").val(selectedTimezone)
     $('select').select2();
@@ -90,7 +112,7 @@ function setUnix(unixTime) {
     updateAll();
 }
 function setText(text) {
-    time = spacetime(text);
+    time = time.time(text);
     updateAll();
 }
 function setTimezone(timezone) {
