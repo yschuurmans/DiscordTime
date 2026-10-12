@@ -1,38 +1,314 @@
-.outputTable tr td:nth-child(2) {
-    border-left: 2px solid grey;
+:root {
+    --bg: #17181b;
+    --surface: #1f2024;
+    --surface-raised: #27292e;
+    --border: #2f3137;
+    --text: #e6e6e8;
+    --text-muted: #9a9ba2;
+    --accent: #8ea1f0;
+    --ok: #5fbf86;
+    --error: #f08a8a;
+    --chip: rgba(255, 255, 255, 0.07);
+    --radius: 8px;
+    --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
 }
 
-.outputTable tr td:nth-child(1) {
-    padding-right: 10px;
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg: #f4f4f2;
+        --surface: #ffffff;
+        --surface-raised: #f0f0ee;
+        --border: #dededa;
+        --text: #1d1e21;
+        --text-muted: #686a70;
+        --accent: #4357c4;
+        --ok: #23824b;
+        --error: #c23b3b;
+        --chip: rgba(0, 0, 0, 0.06);
+    }
 }
 
-.outputTable tr td:nth-child(2) {
-    padding-left: 5px;
+* {
+    box-sizing: border-box;
 }
 
-.select2-search {
-    background-color: #2f2f2f;
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
-.select2-results {
-    background-color: #2f2f2f;
+.site-header,
+.layout {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 16px;
 }
 
-.select2-selection {
-    background-color: #3b3b3b !IMPORTANT;
+.site-header {
+    padding-top: 40px;
+    padding-bottom: 24px;
 }
 
-.select2-selection>span {
-    color: #ffffff !IMPORTANT
+.site-header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
 }
 
-.popup {
-    position: fixed;
-    background-color: rgb(107, 107, 107);
-    padding: 0 20px;
-    border-radius: 5px;
-    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s;
+.site-header p {
+    margin: 4px 0 0;
+    color: var(--text-muted);
+}
+
+.layout {
+    display: grid;
+    gap: 16px;
+    padding-bottom: 48px;
+}
+
+@media (min-width: 820px) {
+    .layout {
+        grid-template-columns: 5fr 6fr;
+        align-items: start;
+    }
+}
+
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    min-width: 0;
+}
+
+.panel-title {
+    margin: 0 0 16px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+/* Current time readout */
+
+.clock {
+    display: grid;
+    gap: 10px;
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.clock-row {
+    display: grid;
+}
+
+.clock-label {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.clock-value {
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.clock-row-muted .clock-value {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+/* Inputs */
+
+.fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.field {
+    display: grid;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-muted);
+    min-width: 0;
+}
+
+.field-wide {
+    grid-column: 1 / -1;
+}
+
+input {
+    width: 100%;
+    font: inherit;
+    font-size: 15px;
+    color: var(--text);
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 10px;
+}
+
+.field-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.field-hint.is-error {
+    color: var(--error);
+}
+
+input[aria-invalid="true"] {
+    border-color: var(--error);
+}
+
+#dtUnix {
+    font-family: var(--mono);
+    font-size: 14px;
+}
+
+input:focus-visible,
+button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Nudge buttons */
+
+.nudges {
+    display: grid;
+    grid-template-columns: auto repeat(4, 1fr);
+    gap: 6px;
+    align-items: center;
+}
+
+.nudge-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding-right: 6px;
+}
+
+.nudges button {
+    font: inherit;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 0;
+    cursor: pointer;
+}
+
+.nudges button:hover {
+    border-color: var(--text-muted);
+}
+
+.nudges button:active {
+    transform: translateY(1px);
+}
+
+.text-button {
+    margin-top: 14px;
+    padding: 0;
+    font: inherit;
+    font-size: 13px;
+    color: var(--accent);
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+.text-button:hover {
+    text-decoration: underline;
+}
+
+/* Output formats */
+
+.formats {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.formats li + li {
+    border-top: 1px solid var(--border);
+}
+
+.format {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "code name"
+        "preview preview";
+    gap: 2px 12px;
+    width: 100%;
+    padding: 10px 12px;
+    font: inherit;
+    text-align: left;
+    color: var(--text);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.format:hover {
+    background: var(--surface-raised);
+}
+
+.format-code {
+    grid-area: code;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.format:hover .format-code {
+    color: var(--text);
+}
+
+/* Mirrors how Discord highlights a rendered timestamp */
+.format-preview {
+    grid-area: preview;
+    justify-self: start;
+    padding: 0 3px;
+    border-radius: 3px;
+    background: var(--chip);
+}
+
+.format-name {
+    grid-area: name;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.format-copied {
+    grid-area: name;
+    justify-self: end;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ok);
+    background: inherit;
+}
+
+.format.is-copied .format-name {
+    visibility: hidden;
+}
+
+.hint {
+    margin: 12px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
 }

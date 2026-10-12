@@ -1,222 +1,250 @@
-
-var time;
-var selectedTimezone;
-const urlSearchParams = Object.fromEntries(new URLSearchParams(window.location.search).entries());
-var querytime = "";
-var querytimezone = "";
-if(Object.keys(urlSearchParams)[0]){
-    querytime = Object.keys(urlSearchParams)[0];
-    
-    if(querytime.split("-")[1]){
-        querytimezone = querytime.split("-")[1];
-    }
-    if(querytime.toLowerCase().endsWith("st")){
-        querytimezone = "Server Time (GMT-0)"
-    }
+// Friendly names for FFXIV players; spacetime only knows IANA ids, so these map to GMT
+const customTimezones = {
+    "Eorzean ST (GMT-0)": "Etc/GMT",
+    "Server Time (GMT-0)": "Etc/GMT"
+};
+function resolveTimezone(tz) {
+    return customTimezones[tz] || tz;
 }
 
-$(function () {
+// Discord renders timestamps with the viewer's locale, so the previews use Intl the same way
+const FORMATS = [
+    { code: "t", name: "Short time", options: { timeStyle: "short" } },
+    { code: "T", name: "Long time", options: { timeStyle: "medium" } },
+    { code: "d", name: "Short date", options: { year: "numeric", month: "2-digit", day: "2-digit" } },
+    { code: "D", name: "Long date", options: { dateStyle: "long" } },
+    { code: "f", name: "Date and time", options: { dateStyle: "long", timeStyle: "short" } },
+    { code: "F", name: "Full date and time", options: { dateStyle: "full", timeStyle: "short" } },
+    { code: "R", name: "Relative" }
+];
+
+const RELATIVE_UNITS = [
+    ["year", 365 * 24 * 3600],
+    ["month", 30 * 24 * 3600],
+    ["day", 24 * 3600],
+    ["hour", 3600],
+    ["minute", 60],
+    ["second", 1]
+];
+
+var time;
+var selectedTimezone = "Eorzean ST (GMT-0)";
+var allTimezones = [];
+
+const $ = (id) => document.getElementById(id);
+
+// Query string shortcut: ?8pm, ?8pm-europe/amsterdam, or ?8pmst for Server Time
+const urlSearchParams = Object.fromEntries(new URLSearchParams(window.location.search).entries());
+var querytime = Object.keys(urlSearchParams)[0] || "";
+var querytimezone = "";
+if (querytime.split("-")[1]) {
+    querytimezone = querytime.split("-")[1];
+}
+if (querytime.toLowerCase().endsWith("st")) {
+    querytimezone = "Server Time (GMT-0)";
+}
+
+document.addEventListener("DOMContentLoaded", function () {
     time = spacetime.now().seconds(0);
-	
-    selectedTimezone = "Eorzean ST (GMT-0)"
-    $("#localTimezone").text(time.timezone().name);
+    $("localTimezone").textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || time.timezone().name;
 
-    var allTimezones = spacetime.timezones();
-    allTimezones["Eorzean ST (GMT-0)"] = { offset: -0, hem: 'n' }
-    allTimezones["Server Time (GMT-0)"] = { offset: -0, hem: 'n' }
-    var allTimezones = Object.keys(allTimezones).sort();
-    allTimezones.forEach(function (tz, index) {
-        $("#dtTimezone").append(`<option value="${tz}">${tz}</option>`)
-    });
+    allTimezones = Object.keys(spacetime.timezones())
+        .concat(Object.keys(customTimezones))
+        .sort();
+    $("timezoneList").innerHTML = allTimezones.map((tz) => `<option value="${tz}"></option>`).join("");
 
-	if(querytimezone) {
-        selectedTimezone = querytimezone;
-        time = time.goto(querytimezone);
+    buildFormatList();
+
+    if (querytimezone && findTimezone(querytimezone)) {
+        selectedTimezone = findTimezone(querytimezone);
     }
-	if(querytime) {
+    time = time.goto(resolveTimezone(selectedTimezone));
+    if (querytime) {
         time = time.time(querytime);
     }
-    
-    updateAll();
-    $('select').select2({
-        theme: 'bootstrap-5',
+
+    $("dtDate").addEventListener("change", setDateTime);
+    $("dtTime").addEventListener("change", setDateTime);
+    $("dtUnix").addEventListener("change", (e) => setUnix(e.target.value));
+    $("dtTimezone").addEventListener("change", (e) => setTimezone(e.target.value));
+    $("dtTimezone").addEventListener("focus", (e) => e.target.select());
+    $("dtHuman").addEventListener("input", previewHuman);
+    $("dtHuman").addEventListener("change", commitHuman);
+    $("dtHuman").addEventListener("focus", (e) => e.target.select());
+    $("dtHuman").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            commitHuman();
+        }
     });
-
-    // Select all elements with the class clickableCopy
-    var copies = document.querySelectorAll('.clickableCopy');
-
-    // Add a click event listener to each selected element
-    copies.forEach(function (copy) {
-        copy.addEventListener('click', function () {
-            // Use the Clipboard API to copy the text content of the clicked element to the clipboard
-            navigator.clipboard.writeText(this.textContent).then(function () {
-                // Create a popup element with the text "Copied!"
-                var popup = document.createElement('div');
-                popup.textContent = 'Copied!';
-                popup.className = 'popup';
-
-                // Get the bounding rectangle of the clicked element
-                var rect = copy.getBoundingClientRect();
-
-                // Position the popup at the top-right corner of the clicked element
-                popup.style.top = rect.top + 'px';
-                popup.style.left = rect.right + 'px';
-
-                // Add the popup to the document
-                document.body.appendChild(popup);
-
-                // Make the popup fade in
-                setTimeout(function () {
-                    popup.style.opacity = '1';
-                }, 5);
-
-                // Make the popup fade out and remove it after a delay
-                setTimeout(function () {
-                    popup.style.opacity = '0';
-                    setTimeout(function () {
-                        document.body.removeChild(popup);
-                    }, 300); // 0.3 seconds
-                }, 2000); // 2 seconds
-            }, function (err) {
-                console.error('Could not copy text: ', err);
-            });
+    $("nowButton").addEventListener("click", () => {
+        time = spacetime.now().seconds(0).goto(resolveTimezone(selectedTimezone));
+        updateAll();
+    });
+    document.querySelectorAll("[data-add]").forEach((button) => {
+        button.addEventListener("click", () => {
+            time = time.add(Number(button.dataset.add), button.dataset.unit);
+            updateAll();
         });
     });
 
+    updateAll();
+    // Keep the relative preview honest as the clock moves on
+    setInterval(renderFormats, 15000);
 });
 
-function copyToClip(value) {
-    navigator.clipboard.writeText(value);
+function findTimezone(name) {
+    var lower = name.trim().toLowerCase();
+    return allTimezones.find((tz) => tz.toLowerCase() === lower);
+}
+
+function unixSeconds() {
+    return Math.floor(time.epoch / 1000);
+}
+
+function formatClock(epoch, timeZone) {
+    var options = { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
+    try {
+        return new Intl.DateTimeFormat(undefined, Object.assign({ timeZone: timeZone }, options)).format(epoch);
+    } catch (err) {
+        // A spacetime zone id the browser doesn't recognise
+        return spacetime(epoch).goto(timeZone).format("{day-short} {month-short} {date}, {time}");
+    }
 }
 
 function updateAll() {
-    var unix = Math.floor(time.epoch / 1000);
-    $("#localTime").text(time.goto(null).format('nice-full'))
+    var zoned = time.goto(resolveTimezone(selectedTimezone));
 
-    $("#timezoneName").text(selectedTimezone)
+    $("timezoneName").textContent = selectedTimezone;
+    $("timezoneTime").textContent = formatClock(time.epoch, resolveTimezone(selectedTimezone));
+    $("localTime").textContent = formatClock(time.epoch, undefined);
 
-    $("#timezoneTime").text(time.goto(selectedTimezone).format('nice-full'))
+    $("dtDate").value = zoned.format("iso-short");
+    $("dtTime").value = zoned.format("{hour-24-pad}:{minute-pad}");
+    $("dtTimezone").value = selectedTimezone;
+    $("dtUnix").value = unixSeconds();
+    $("dtHuman").value = describeTime(time, resolveTimezone(selectedTimezone));
+    $("dtHuman").removeAttribute("aria-invalid");
+    setHumanHint(HUMAN_HINT);
 
-
-    $("#dtUnix").val(unix)
-    $("#dtText").val(time.goto(null).format('nice'))
-
-    $("#dtTimezone").val(selectedTimezone)
-    $('select').select2();
-
-    calculateDiscordNotations(unix);
+    renderFormats();
 }
 
-function setUnix(unixTime) {
-    time = spacetime(unixTime * 1000);
-    updateAll();
-}
-function setText(text) {
-    time = time.time(text);
-    updateAll();
-}
-function setTimezone(timezone) {
-    time = time.goto(timezone);
-    selectedTimezone = timezone;
-    updateAll();
-}
-function addMinutes(minutes) {
-    time = time.add(minutes, 'minutes');
-    updateAll();
-}
-function addHours(hours) {
-    time = time.add(hours, 'hours');
-    updateAll();
-}
-function addDays(days) {
-    time = time.add(days, 'days');
-    updateAll();
+const HUMAN_HINT = "Type a time any way you like, then press Enter.";
+
+function setHumanHint(text, isError) {
+    $("dtHumanHint").textContent = text;
+    $("dtHumanHint").classList.toggle("is-error", Boolean(isError));
 }
 
-function calculateDiscordNotations(unix) {
-    calct(unix);
-    calcT(unix);
-    calcd(unix);
-    calcD(unix);
-    calcf(unix);
-    calcF(unix);
-    calcR(unix);
-
+function parseHumanInput() {
+    var zone = resolveTimezone(selectedTimezone);
+    return parseHumanTime($("dtHuman").value, zone, time);
 }
 
-function calct(unix) {
-    $("#disctNotation").text("<t:" + unix + ":t>");
-    $("#disctOutput").text(time.goto(null).format('{hour}:{minute-pad} {AMPM}'));
-}
-
-function calcT(unix) {
-    $("#discTNotation").text("<t:" + unix + ":T>");
-    $("#discTOutput").text(time.goto(null).format('{hour}:{minute-pad}:{second-pad} {AMPM}'));
-}
-
-function calcd(unix) {
-    $("#discdNotation").text("<t:" + unix + ":d>");
-    $("#discdOutput").text(time.goto(null).format('{iso-month}/{date-pad}/{year}'));
-}
-
-function calcD(unix) {
-    $("#discDNotation").text("<t:" + unix + ":D>");
-    $("#discDOutput").text(time.goto(null).format('{month} {date-pad}, {year}'));
-}
-
-function calcf(unix) {
-    $("#discfNotation").text("<t:" + unix + ":f>");
-    $("#discfOutput").text(time.goto(null).format('{month} {date}, {year} {hour}:{minute-pad} {AMPM}'));
-}
-
-function calcF(unix) {
-    $("#discFNotation").text("<t:" + unix + ":F>");
-    $("#discFOutput").text(time.goto(null).format('{day}, {month} {date}, {year} {hour}:{minute-pad} {AMPM}'));
-}
-
-function calcR(unix) {
-    $("#discRNotation").text("<t:" + unix + ":R>");
-    var timediff = 0;
-    var diffUnit = '';
-    if (Math.abs(spacetime.now().diff(time).years) > 0) {
-        timediff = spacetime.now().diff(time).years;
-        diffUnit = 'years';
+// Live feedback while typing; nothing changes until Enter or leaving the field
+function previewHuman() {
+    var result = parseHumanInput();
+    $("dtHuman").removeAttribute("aria-invalid");
+    if (result.time) {
+        setHumanHint("→ " + fullDateText(result.time.goto(resolveTimezone(selectedTimezone))));
+    } else {
+        setHumanHint(result.error || HUMAN_HINT, Boolean(result.error));
     }
-    else if (Math.abs(spacetime.now().diff(time).months) > 0) {
-        timediff = spacetime.now().diff(time).months;
-        diffUnit = 'months';
-    }
-    else if (Math.abs(spacetime.now().diff(time).weeks) > 0) {
-        timediff = spacetime.now().diff(time).weeks;
-        diffUnit = 'weeks';
-    }
-    else if (Math.abs(spacetime.now().diff(time).days) > 0) {
-        timediff = spacetime.now().diff(time).days;
-        diffUnit = 'days';
-    }
-    else if (Math.abs(spacetime.now().diff(time).hours) > 0) {
-        timediff = spacetime.now().diff(time).hours;
-        diffUnit = 'hours';
-    }
-    else if (Math.abs(spacetime.now().diff(time).minutes) > 0) {
-        timediff = spacetime.now().diff(time).minutes;
-        diffUnit = 'minutes';
-    }
-    else {
-        timediff = spacetime.now().diff(time).seconds;
-        if (timediff > 0) {
-            $("#discROutput").text('in a few seconds');
-        }
-        else {
-            $("#discROutput").text('a few seconds ago');
-        }
+}
+
+function commitHuman() {
+    if (!$("dtHuman").value.trim()) {
+        updateAll();
         return;
     }
+    var result = parseHumanInput();
+    if (result.time) {
+        time = result.time;
+        updateAll();
+    } else {
+        $("dtHuman").setAttribute("aria-invalid", "true");
+        setHumanHint(result.error, true);
+    }
+}
 
-    if (timediff > 0) {
-        $("#discROutput").text('in ' + timediff + ' ' + diffUnit);
+function setDateTime() {
+    var date = $("dtDate").value;
+    var clock = $("dtTime").value;
+    if (!date || !clock) {
+        updateAll();
+        return;
     }
-    else {
-        $("#discROutput").text(Math.abs(timediff) + ' ' + diffUnit + ' ago.');
+    time = spacetime(`${date}T${clock}:00`, resolveTimezone(selectedTimezone));
+    updateAll();
+}
+
+function setUnix(value) {
+    var seconds = Number(value.trim());
+    if (value.trim() !== "" && Number.isFinite(seconds)) {
+        time = spacetime(seconds * 1000).goto(resolveTimezone(selectedTimezone));
     }
+    updateAll();
+}
+
+function setTimezone(value) {
+    var match = findTimezone(value);
+    if (match) {
+        selectedTimezone = match;
+        time = time.goto(resolveTimezone(match));
+    }
+    updateAll();
+}
+
+function buildFormatList() {
+    $("formats").innerHTML = FORMATS.map((format) => `
+        <li>
+            <button type="button" class="format" data-code="${format.code}">
+                <code class="format-code"></code>
+                <span class="format-preview"></span>
+                <span class="format-name">${format.name}</span>
+                <span class="format-copied" aria-live="polite"></span>
+            </button>
+        </li>`).join("");
+
+    document.querySelectorAll(".format").forEach((row) => {
+        row.addEventListener("click", () => copyFormat(row));
+    });
+}
+
+function renderFormats() {
+    var unix = unixSeconds();
+    document.querySelectorAll(".format").forEach((row) => {
+        var format = FORMATS.find((f) => f.code === row.dataset.code);
+        row.querySelector(".format-code").textContent = `<t:${unix}:${format.code}>`;
+        row.querySelector(".format-preview").textContent = format.options
+            ? new Intl.DateTimeFormat(undefined, format.options).format(time.epoch)
+            : formatRelative(time.epoch);
+    });
+}
+
+function formatRelative(epoch) {
+    var seconds = (epoch - Date.now()) / 1000;
+    var rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "always" });
+    for (var [unit, size] of RELATIVE_UNITS) {
+        if (Math.abs(seconds) >= size || unit === "second") {
+            return rtf.format(Math.round(seconds / size), unit);
+        }
+    }
+}
+
+function copyFormat(row) {
+    var text = row.querySelector(".format-code").textContent;
+    var status = row.querySelector(".format-copied");
+    navigator.clipboard.writeText(text).then(function () {
+        status.textContent = "Copied";
+        row.classList.add("is-copied");
+        clearTimeout(row.copyTimer);
+        row.copyTimer = setTimeout(function () {
+            row.classList.remove("is-copied");
+            status.textContent = "";
+        }, 1500);
+    }, function (err) {
+        console.error("Could not copy text: ", err);
+    });
 }
